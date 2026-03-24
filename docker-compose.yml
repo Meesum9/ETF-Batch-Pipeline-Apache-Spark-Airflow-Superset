@@ -1,0 +1,100 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────
+#  Local dev stack for the ETF Spark Batch Pipeline
+#  Services: Postgres · Airflow (webserver + scheduler) · Superset
+#  Spark runs locally via PySpark (no Spark cluster needed in dev)
+# ─────────────────────────────────────────────────────────
+
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.9.1-python3.11
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    _PIP_ADDITIONAL_REQUIREMENTS: >
+      yfinance boto3 pyspark pyarrow python-dotenv psycopg2-binary
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./ingestion:/opt/airflow/ingestion
+    - ./spark_jobs:/opt/airflow/spark_jobs
+    - ./config:/opt/airflow/config
+    - airflow_logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+
+  # ── Postgres (Airflow metadata + Gold sink for Superset) ────────────────
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init_finance_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+
+  # ── Airflow initialiser (run once) ────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow users create \
+          --username admin --password admin \
+          --firstname Admin --lastname User \
+          --role Admin --email admin@example.com
+    restart: "no"
+
+  # ── Airflow webserver ────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      retries: 5
+
+  # ── Airflow scheduler ────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+  # ── Apache Superset ──────────────────────────────────────────────────────
+  superset:
+    image: apache/superset:3.1.0
+    environment:
+      SUPERSET_SECRET_KEY: "changeme_super_secret_key"
+      DATABASE_URL: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    ports:
+      - "8088:8088"
+    depends_on:
+      - postgres
+    command: >
+      bash -c "
+        superset db upgrade &&
+        superset fab create-admin
+          --username admin --firstname Admin --lastname User
+          --email admin@superset.com --password admin &&
+        superset init &&
+        superset run -h 0.0.0.0 -p 8088"
+
+volumes:
+  postgres_data:
+  airflow_logs:
