@@ -17,7 +17,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, LongType, StringType, DateType
 from dotenv import load_dotenv
 
-load_dotenv("config/.env")
+load_dotenv("../config/.env")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

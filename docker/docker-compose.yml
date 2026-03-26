@@ -7,7 +7,9 @@ version: "3.9"
 # ─────────────────────────────────────────────────────────
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.1-python3.11
+  build:
+    context: .
+    dockerfile: Dockerfile
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -15,10 +17,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
-    _PIP_ADDITIONAL_REQUIREMENTS: >
-      yfinance boto3 pyspark pyarrow python-dotenv psycopg2-binary
   volumes:
-    - ./dags:/opt/airflow/dags
+    - /Users/mac/de/batch-processing/dags:/opt/airflow/dags
     - ./ingestion:/opt/airflow/ingestion
     - ./spark_jobs:/opt/airflow/spark_jobs
     - ./config:/opt/airflow/config
@@ -40,7 +40,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init_finance_db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init_finance_db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
@@ -86,14 +86,7 @@ services:
       - "8088:8088"
     depends_on:
       - postgres
-    command: >
-      bash -c "
-        superset db upgrade &&
-        superset fab create-admin
-          --username admin --firstname Admin --lastname User
-          --email admin@superset.com --password admin &&
-        superset init &&
-        superset run -h 0.0.0.0 -p 8088"
+    command: bash -c "superset db upgrade && superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin && superset init && superset run -h 0.0.0.0 -p 8088"
 
 volumes:
   postgres_data:

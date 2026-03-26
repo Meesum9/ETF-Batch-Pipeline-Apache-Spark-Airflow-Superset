@@ -23,7 +23,7 @@ from pyspark.sql import SparkSession, Window
 from pyspark.sql import functions as F
 from dotenv import load_dotenv
 
-load_dotenv("config/.env")
+load_dotenv("../config/.env")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,24 @@
+# Data Ingestion
+yfinance>=0.2.18
+pandas>=2.0.0
+
+# AWS S3
+boto3>=1.26.0
+botocore>=1.29.0
+
+# Apache Spark
+pyspark>=3.4.0
+pyarrow>=12.0.0
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+
+# Database
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+
+# Airflow (for DAG development)
+apache-airflow>=2.9.0
+
+# Logging & Utilities
+requests>=2.31.0
